@@ -1,0 +1,48 @@
+name: Build Nukkit Plugin (auto download)
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Clonar el repositorio
+      uses: actions/checkout@v3
+
+    - name: Configurar Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Descargar Nukkit.jar
+      run: |
+        mkdir -p nukkit-jar
+        curl -L -o nukkit-jar/Nukkit.jar \
+        https://ci.opencollab.dev/job/NukkitX/job/Nukkit/job/master/lastSuccessfulBuild/artifact/target/nukkit-1.0-SNAPSHOT.jar
+
+    - name: Crear carpeta de salida
+      run: mkdir -p build
+
+    - name: Compilar plugin
+      run: |
+        javac -d build -cp "nukkit-jar/Nukkit.jar" src/**/*.java
+
+    - name: Copiar plugin.yml
+      run: cp plugin.yml build/
+
+    - name: Empaquetar plugin JAR
+      run: |
+        cd build
+        jar cf AntiCheatPatch.jar tripu1404/anticheatpatch/*.class plugin.yml
+
+    - name: Subir artefacto
+      uses: actions/upload-artifact@v4
+      with:
+        name: AntiCheatPatch
+        path: build/AntiCheatPatch.jar
