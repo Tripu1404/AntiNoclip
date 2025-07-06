@@ -15,7 +15,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
 
     private final double MAX_VERTICAL_SPEED = 1.2;
     private final double MIN_Y_DIFF = -3.0;
-    private final double MIN_PLAYER_HEIGHT = 1.2; // normal es ~1.8
+    private final double MIN_PLAYER_HEIGHT = 1.2; // altura sospechosa (normal ≈ 1.8)
     private final HashMap<String, Integer> playerTicks = new HashMap<>();
 
     @Override
@@ -30,7 +30,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                     playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
                 }
             }
-        }, 20); // cada 20 ticks = 1 segundo
+        }, 20); // 1 segundo
     }
 
     @EventHandler
@@ -43,7 +43,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         double deltaY = toY - fromY;
         int lived = playerTicks.getOrDefault(player.getName(), 0);
 
-        // 🚫 Movimiento vertical excesivo
+        // 🚫 Movimiento vertical excesivo (NoClip)
         if (Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] Movimiento vertical inusual cancelado.");
@@ -61,12 +61,12 @@ public class AntiCheatPatch extends PluginBase implements Listener {
             return;
         }
 
-        // 🧱 Bounding box anómalo (Phase)
+        // 🧱 Bounding box alterado (Phase)
         AxisAlignedBB box = player.getBoundingBox();
-        double boxHeight = box.getMax().getY() - box.getMin().getY();
+        double boxHeight = box.maxY - box.minY;
         if (boxHeight < MIN_PLAYER_HEIGHT) {
             event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] Tamaño corporal alterado detectado.");
+            player.sendMessage("§c[AntiCheat] Tamaño corporal anómalo detectado.");
         }
     }
 
