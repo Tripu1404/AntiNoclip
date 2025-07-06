@@ -63,7 +63,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
 
         // 🧱 Bounding box alterado (Phase)
         AxisAlignedBB box = player.getBoundingBox();
-        double boxHeight = box.upper.y - box.lower.y;
+        double boxHeight = box.getMaxY() - box.getMinY();
         if (boxHeight < MIN_PLAYER_HEIGHT) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] Tamaño corporal anómalo detectado.");
