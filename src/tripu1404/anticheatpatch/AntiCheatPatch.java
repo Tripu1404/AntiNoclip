@@ -40,32 +40,28 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         double toY = event.getTo().getY();
         double deltaY = toY - fromY;
 
-        if (Math.abs(deltaY) > MAX_VERTICAL_SPEED) {
+        // 🚫 Movimiento vertical excesivo
+        if (Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
             event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] Movimiento vertical excesivo cancelado.");
+            player.sendMessage("§c[AntiCheat] Movimiento vertical inusual cancelado.");
             return;
         }
 
-        if (deltaY < MIN_Y_DIFF) {
+        // ⛔ Phaseo hacia abajo (AntiCrystal)
+        int lived = playerTicks.getOrDefault(player.getName(), 0);
+        if (!player.isOnGround()
+                && !player.getAllowFlight()
+                && player.getGamemode() != Player.CREATIVE
+                && deltaY < -0.5
+                && lived > 1) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] No puedes atravesar el piso.");
-            return;
-        }
-
-        int lived = playerTicks.getOrDefault(player.getName(), 0);
-
-        // 🛡️ Detectar flotamiento sospechoso (NoClip)
-        if (!player.getAllowFlight() && !player.isFlying()) {
-            if (!player.isOnGround() && Math.abs(deltaY) < 0.01 && lived > 1) {
-                event.setCancelled(true);
-                player.sendMessage("§c[AntiCheat] Movimiento flotante no permitido.");
-            }
         }
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         String name = event.getPlayer().getName();
-        playerTicks.remove(name); // 🧹 Limpieza al salir
+        playerTicks.remove(name); // Limpieza de datos al salir
     }
 }
