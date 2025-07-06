@@ -4,6 +4,7 @@ import cn.nukkit.Player;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerMoveEvent;
+import cn.nukkit.event.player.PlayerQuitEvent;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.scheduler.Task;
 
@@ -18,7 +19,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("AntiCheatPatch habilitado.");
+        getLogger().info("§a[AntiCheatPatch] Activado correctamente.");
 
         getServer().getScheduler().scheduleRepeatingTask(this, new Task() {
             @Override
@@ -27,7 +28,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                     playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
                 }
             }
-        }, 20); // Cada 20 ticks = 1 segundo
+        }, 20); // cada 20 ticks = 1 segundo
     }
 
     @EventHandler
@@ -41,7 +42,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
 
         if (Math.abs(deltaY) > MAX_VERTICAL_SPEED) {
             event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] Movimiento vertical inusual cancelado.");
+            player.sendMessage("§c[AntiCheat] Movimiento vertical excesivo cancelado.");
             return;
         }
 
@@ -52,11 +53,19 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         }
 
         int lived = playerTicks.getOrDefault(player.getName(), 0);
-        if (!player.isOnGround() && !player.getAllowFlight()) {
-            if (Math.abs(deltaY) < 0.01 && lived > 1) {
+
+        // 🛡️ Detectar flotamiento sospechoso (NoClip)
+        if (!player.getAllowFlight() && !player.isFlying()) {
+            if (!player.isOnGround() && Math.abs(deltaY) < 0.01 && lived > 1) {
                 event.setCancelled(true);
                 player.sendMessage("§c[AntiCheat] Movimiento flotante no permitido.");
             }
         }
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        String name = event.getPlayer().getName();
+        playerTicks.remove(name); // 🧹 Limpieza al salir
     }
 }
