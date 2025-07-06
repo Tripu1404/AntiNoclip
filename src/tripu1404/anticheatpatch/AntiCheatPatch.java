@@ -5,6 +5,7 @@ import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerMoveEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
+import cn.nukkit.level.block.Block;
 import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.scheduler.Task;
@@ -14,7 +15,6 @@ import java.util.HashMap;
 public class AntiCheatPatch extends PluginBase implements Listener {
 
     private final double MAX_VERTICAL_SPEED = 1.2;
-    private final double MIN_Y_DIFF = -3.0;
     private final double MIN_PLAYER_HEIGHT = 1.2;
     private final HashMap<String, Integer> playerTicks = new HashMap<>();
 
@@ -38,20 +38,34 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         Player player = event.getPlayer();
         if (player == null || !player.isOnline()) return;
 
+        // 🪂 Ignorar si el jugador está usando elytras
+        if (player.isGliding()) return;
+
         double fromY = event.getFrom().getY();
         double toY = event.getTo().getY();
         double deltaY = toY - fromY;
         int lived = playerTicks.getOrDefault(player.getName(), 0);
 
+        // 🧱 Verifica si el jugador está dentro de un bloque sólido
+        boolean isInSolidBlock = !player.getLevel().getBlock(player.getLocation()).isTransparent();
+
+        // 🚫 Jugador dentro de un bloque sólido
+        if (isPlayerInsideSolidBlock(player) && !player.getAllowFlight() && player.getGamemode() != Player.CREATIVE) {
+            event.setCancelled(true);
+            player.sendMessage("§c[AntiCheat] No puedes estar dentro de bloques.");
+            return;
+        }
+
         // 🚫 Movimiento vertical excesivo (NoClip)
-        if (Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
+        if (isInSolidBlock && Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] Movimiento vertical inusual cancelado.");
             return;
         }
 
         // ⛔ Phaseo hacia abajo (AntiCrystal)
-        if (!player.isOnGround()
+        if (isInSolidBlock
+                && !player.isOnGround()
                 && !player.getAllowFlight()
                 && player.getGamemode() != Player.CREATIVE
                 && deltaY < -0.5
@@ -61,10 +75,10 @@ public class AntiCheatPatch extends PluginBase implements Listener {
             return;
         }
 
-        // 🧱 Bounding box alterado (Phase)
+        // 🧍‍♂️ Bounding box alterado (Phase)
         AxisAlignedBB box = player.getBoundingBox();
         double boxHeight = box.getMaxY() - box.getMinY();
-        if (boxHeight < MIN_PLAYER_HEIGHT) {
+        if (isInSolidBlock && boxHeight < MIN_PLAYER_HEIGHT) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] Tamaño corporal anómalo detectado.");
         }
@@ -73,5 +87,28 @@ public class AntiCheatPatch extends PluginBase implements Listener {
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         playerTicks.remove(event.getPlayer().getName());
+    }
+
+    // 🔍 Verifica si el jugador está dentro de un bloque sólido
+    private boolean isPlayerInsideSolidBlock(Player player) {
+        AxisAlignedBB box = player.getBoundingBox();
+        int minX = (int) Math.floor(box.getMinX());
+        int maxX = (int) Math.floor(box.getMaxX());
+        int minY = (int) Math.floor(box.getMinY());
+        int maxY = (int) Math.floor(box.getMaxY());
+        int minZ = (int) Math.floor(box.getMinZ());
+        int maxZ = (int) Math.floor(box.getMaxZ());
+
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    Block block = player.getLevel().getBlock(x, y, z);
+                    if (!block.isTransparent()) {
+                        return true; // Está dentro de al menos un bloque sólido
+                    }
+                }
+            }
+        }
+        return false;
     }
 }
