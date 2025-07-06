@@ -30,7 +30,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                     playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
                 }
             }
-        }, 20);
+        }, 20); // 1 segundo
     }
 
     @EventHandler
@@ -43,12 +43,14 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         double deltaY = toY - fromY;
         int lived = playerTicks.getOrDefault(player.getName(), 0);
 
+        // 🚫 Movimiento vertical excesivo (NoClip)
         if (Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] Movimiento vertical inusual cancelado.");
             return;
         }
 
+        // ⛔ Phaseo hacia abajo (AntiCrystal)
         if (!player.isOnGround()
                 && !player.getAllowFlight()
                 && player.getGamemode() != Player.CREATIVE
@@ -59,8 +61,9 @@ public class AntiCheatPatch extends PluginBase implements Listener {
             return;
         }
 
+        // 🧱 Bounding box alterado (Phase)
         AxisAlignedBB box = player.getBoundingBox();
-        double boxHeight = box.maxY - box.minY;
+        double boxHeight = box.getY2() - box.getY1();
         if (boxHeight < MIN_PLAYER_HEIGHT) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] Tamaño corporal anómalo detectado.");
