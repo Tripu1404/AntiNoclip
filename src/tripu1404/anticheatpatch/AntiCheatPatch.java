@@ -38,7 +38,6 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         Player player = event.getPlayer();
         if (player == null || !player.isOnline()) return;
 
-        // 🪂 Ignorar si el jugador está usando elytras
         if (player.isGliding()) return;
 
         double fromY = event.getFrom().getY();
@@ -46,24 +45,18 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         double deltaY = toY - fromY;
         int lived = playerTicks.getOrDefault(player.getName(), 0);
 
-        // 🧱 Verifica si el jugador está dentro de un bloque sólido
         boolean isInSolidBlock = !player.getLevel().getBlock(player.getLocation()).isTransparent();
 
-        // 🚫 Jugador dentro de un bloque sólido
         if (isPlayerInsideSolidBlock(player) && !player.getAllowFlight() && player.getGamemode() != Player.CREATIVE) {
             event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] No puedes estar dentro de bloques.");
             return;
         }
 
-        // 🚫 Movimiento vertical excesivo (NoClip)
         if (isInSolidBlock && Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
             event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] Movimiento vertical inusual cancelado.");
             return;
         }
 
-        // ⛔ Phaseo hacia abajo (AntiCrystal)
         if (isInSolidBlock
                 && !player.isOnGround()
                 && !player.getAllowFlight()
@@ -71,16 +64,13 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                 && deltaY < -0.5
                 && lived > 1) {
             event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] No puedes atravesar el piso.");
             return;
         }
 
-        // 🧍‍♂️ Bounding box alterado (Phase)
         AxisAlignedBB box = player.getBoundingBox();
         double boxHeight = box.getMaxY() - box.getMinY();
         if (isInSolidBlock && boxHeight < MIN_PLAYER_HEIGHT) {
             event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] Tamaño corporal anómalo detectado.");
         }
     }
 
@@ -89,7 +79,6 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         playerTicks.remove(event.getPlayer().getName());
     }
 
-    // 🔍 Verifica si el jugador está dentro de un bloque sólido
     private boolean isPlayerInsideSolidBlock(Player player) {
         AxisAlignedBB box = player.getBoundingBox();
         int minX = (int) Math.floor(box.getMinX());
@@ -104,7 +93,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                 for (int z = minZ; z <= maxZ; z++) {
                     Block block = player.getLevel().getBlock(x, y, z);
                     if (!block.isTransparent()) {
-                        return true; // Está dentro de al menos un bloque sólido
+                        return true;
                     }
                 }
             }
