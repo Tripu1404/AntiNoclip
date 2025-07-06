@@ -1,4 +1,4 @@
-name: Build Nukkit Plugin (auto download)
+name: Build Nukkit Plugin
 
 on:
   push:
@@ -29,19 +29,20 @@ jobs:
     - name: Crear carpeta de salida
       run: mkdir -p build
 
-    - name: Compilar plugin
+    - name: Buscar archivos Java y compilar
       run: |
-        javac -d build -cp "nukkit-jar/Nukkit.jar" src/**/*.java
+        find src -name "*.java" > sources.txt
+        javac -d build -cp "nukkit-jar/Nukkit.jar" @sources.txt
 
     - name: Copiar plugin.yml
       run: cp plugin.yml build/
 
-    - name: Empaquetar plugin JAR
+    - name: Empaquetar JAR del plugin
       run: |
         cd build
         jar cf AntiCheatPatch.jar tripu1404/anticheatpatch/*.class plugin.yml
 
-    - name: Subir artefacto
+    - name: Subir artefacto compilado
       uses: actions/upload-artifact@v4
       with:
         name: AntiCheatPatch
