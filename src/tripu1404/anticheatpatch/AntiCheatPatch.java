@@ -5,6 +5,7 @@ import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerMoveEvent;
 import cn.nukkit.event.player.PlayerQuitEvent;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.plugin.PluginBase;
 import cn.nukkit.scheduler.Task;
 
@@ -14,6 +15,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
 
     private final double MAX_VERTICAL_SPEED = 1.2;
     private final double MIN_Y_DIFF = -3.0;
+    private final double MIN_PLAYER_HEIGHT = 1.2; // normal es ~1.8
     private final HashMap<String, Integer> playerTicks = new HashMap<>();
 
     @Override
@@ -39,6 +41,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         double fromY = event.getFrom().getY();
         double toY = event.getTo().getY();
         double deltaY = toY - fromY;
+        int lived = playerTicks.getOrDefault(player.getName(), 0);
 
         // 🚫 Movimiento vertical excesivo
         if (Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
@@ -48,7 +51,6 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         }
 
         // ⛔ Phaseo hacia abajo (AntiCrystal)
-        int lived = playerTicks.getOrDefault(player.getName(), 0);
         if (!player.isOnGround()
                 && !player.getAllowFlight()
                 && player.getGamemode() != Player.CREATIVE
@@ -56,12 +58,20 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                 && lived > 1) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] No puedes atravesar el piso.");
+            return;
+        }
+
+        // 🧱 Bounding box anómalo (Phase)
+        AxisAlignedBB box = player.getBoundingBox();
+        double boxHeight = box.getMax().getY() - box.getMin().getY();
+        if (boxHeight < MIN_PLAYER_HEIGHT) {
+            event.setCancelled(true);
+            player.sendMessage("§c[AntiCheat] Tamaño corporal alterado detectado.");
         }
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        String name = event.getPlayer().getName();
-        playerTicks.remove(name); // Limpieza de datos al salir
+        playerTicks.remove(event.getPlayer().getName());
     }
 }
