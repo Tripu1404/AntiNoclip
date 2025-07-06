@@ -1,77 +1,17 @@
-package tripu1404.anticheatpatch;
-
-import cn.nukkit.Player;
-import cn.nukkit.event.EventHandler;
-import cn.nukkit.event.Listener;
-import cn.nukkit.event.player.PlayerMoveEvent;
-import cn.nukkit.event.player.PlayerQuitEvent;
-import cn.nukkit.math.AxisAlignedBB;
-import cn.nukkit.plugin.PluginBase;
-import cn.nukkit.scheduler.Task;
-
-import java.util.HashMap;
-
-public class AntiCheatPatch extends PluginBase implements Listener {
-
-    private final double MAX_VERTICAL_SPEED = 1.2;
-    private final double MIN_Y_DIFF = -3.0;
-    private final double MIN_PLAYER_HEIGHT = 1.2; // altura sospechosa (normal ≈ 1.8)
-    private final HashMap<String, Integer> playerTicks = new HashMap<>();
-
-    @Override
-    public void onEnable() {
-        getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("§a[AntiCheatPatch] Activado correctamente.");
-
-        getServer().getScheduler().scheduleRepeatingTask(this, new Task() {
-            @Override
-            public void onRun(int currentTick) {
-                for (Player p : getServer().getOnlinePlayers().values()) {
-                    playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
-                }
-            }
-        }, 20); // 1 segundo
-    }
-
-    @EventHandler
-    public void onPlayerMove(PlayerMoveEvent event) {
-        Player player = event.getPlayer();
-        if (player == null || !player.isOnline()) return;
-
-        double fromY = event.getFrom().getY();
-        double toY = event.getTo().getY();
-        double deltaY = toY - fromY;
-        int lived = playerTicks.getOrDefault(player.getName(), 0);
-
-        // 🚫 Movimiento vertical excesivo (NoClip)
-        if (Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
-            event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] Movimiento vertical inusual cancelado.");
-            return;
-        }
-
-        // ⛔ Phaseo hacia abajo (AntiCrystal)
-        if (!player.isOnGround()
-                && !player.getAllowFlight()
-                && player.getGamemode() != Player.CREATIVE
-                && deltaY < -0.5
-                && lived > 1) {
-            event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] No puedes atravesar el piso.");
-            return;
-        }
-
-        // 🧱 Bounding box alterado (Phase)
-        AxisAlignedBB box = player.getBoundingBox();
+3s
+Run find src -name "*.java" > sources.txt
+  
+src/tripu1404/anticheatpatch/AntiCheatPatch.java:66: error: cannot find symbol
         double boxHeight = box.maxY - box.minY;
-        if (boxHeight < MIN_PLAYER_HEIGHT) {
-            event.setCancelled(true);
-            player.sendMessage("§c[AntiCheat] Tamaño corporal anómalo detectado.");
-        }
-    }
-
-    @EventHandler
-    public void onPlayerQuit(PlayerQuitEvent event) {
-        playerTicks.remove(event.getPlayer().getName());
-    }
-}
+                              ^
+  symbol:   variable maxY
+  location: variable box of type AxisAlignedBB
+src/tripu1404/anticheatpatch/AntiCheatPatch.java:66: error: cannot find symbol
+        double boxHeight = box.maxY - box.minY;
+                                         ^
+  symbol:   variable minY
+  location: variable box of type AxisAlignedBB
+Note: src/tripu1404/anticheatpatch/AntiCheatPatch.java uses or overrides a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+2 errors
+Error: Process completed with exit code 1.
