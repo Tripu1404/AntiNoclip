@@ -5,16 +5,29 @@ import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerMoveEvent;
 import cn.nukkit.plugin.PluginBase;
+import cn.nukkit.scheduler.Task;
+
+import java.util.HashMap;
 
 public class AntiCheatPatch extends PluginBase implements Listener {
 
     private final double MAX_VERTICAL_SPEED = 1.2;
     private final double MIN_Y_DIFF = -3.0;
+    private final HashMap<String, Integer> playerTicks = new HashMap<>();
 
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("AntiCheatPatch habilitado.");
+
+        getServer().getScheduler().scheduleRepeatingTask(this, new Task() {
+            @Override
+            public void onRun(int currentTick) {
+                for (Player p : getServer().getOnlinePlayers().values()) {
+                    playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
+                }
+            }
+        }, 20); // Cada 20 ticks = 1 segundo
     }
 
     @EventHandler
@@ -35,10 +48,12 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         if (deltaY < MIN_Y_DIFF) {
             event.setCancelled(true);
             player.sendMessage("§c[AntiCheat] No puedes atravesar el piso.");
+            return;
         }
 
+        int lived = playerTicks.getOrDefault(player.getName(), 0);
         if (!player.isOnGround() && !player.getAllowFlight()) {
-            if (Math.abs(deltaY) < 0.01 && player.getTicksLived() > 20) {
+            if (Math.abs(deltaY) < 0.01 && lived > 1) {
                 event.setCancelled(true);
                 player.sendMessage("§c[AntiCheat] Movimiento flotante no permitido.");
             }
