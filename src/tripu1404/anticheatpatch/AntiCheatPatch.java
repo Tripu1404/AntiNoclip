@@ -86,14 +86,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
 
         // Reducimos la caja un poco para evitar falsos positivos en bordes
         double shrink = 0.1;
-        AxisAlignedBB innerBox = new AxisAlignedBB(
-                box.getMinX() + shrink,
-                box.getMinY() + shrink,
-                box.getMinZ() + shrink,
-                box.getMaxX() - shrink,
-                box.getMaxY() - shrink,
-                box.getMaxZ() - shrink
-        );
+        AxisAlignedBB innerBox = box.shrink(shrink, shrink, shrink);
 
         int minX = (int) Math.floor(innerBox.getMinX());
         int maxX = (int) Math.floor(innerBox.getMaxX());
@@ -108,17 +101,12 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                     Block block = player.getLevel().getBlock(x, y, z);
 
                     // Saltar aire y bloques transparentes
-                    if (block instanceof BlockAir || block.isTransparent()) {
-                        continue;
-                    }
+                    if (block instanceof BlockAir || block.isTransparent()) continue;
+                    if (block.getBoundingBox() == null) continue;
 
-                    // Si el bloque no tiene bounding box válida, ignorarlo
-                    if (block.getBoundingBox() == null) {
-                        continue;
-                    }
+                    AxisAlignedBB bb = block.getBoundingBox();
 
                     // Solo considerar cubos completos (1x1x1)
-                    AxisAlignedBB bb = block.getBoundingBox();
                     if (bb.getMinX() == block.getX() && bb.getMinY() == block.getY() && bb.getMinZ() == block.getZ()
                             && bb.getMaxX() == block.getX() + 1 && bb.getMaxY() == block.getY() + 1 && bb.getMaxZ() == block.getZ() + 1) {
                         if (innerBox.intersectsWith(bb)) {
