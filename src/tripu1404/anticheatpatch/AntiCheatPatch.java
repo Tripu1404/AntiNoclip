@@ -2,6 +2,8 @@ package tripu1404.anticheatpatch;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
+import cn.nukkit.block.BlockAir;
+import cn.nukkit.block.BlockStairs;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerMoveEvent;
@@ -45,9 +47,9 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         double deltaY = toY - fromY;
         int lived = playerTicks.getOrDefault(player.getName(), 0);
 
-        boolean isInSolidBlock = !player.getLevel().getBlock(player.getLocation()).isTransparent();
+        boolean isInSolidBlock = isPlayerInsideSolidBlock(player);
 
-        if (isPlayerInsideSolidBlock(player) && !player.getAllowFlight() && player.getGamemode() != Player.CREATIVE) {
+        if (isInSolidBlock && !player.getAllowFlight() && player.getGamemode() != Player.CREATIVE) {
             event.setCancelled(true);
             return;
         }
@@ -81,19 +83,40 @@ public class AntiCheatPatch extends PluginBase implements Listener {
 
     private boolean isPlayerInsideSolidBlock(Player player) {
         AxisAlignedBB box = player.getBoundingBox();
-        int minX = (int) Math.floor(box.getMinX());
-        int maxX = (int) Math.floor(box.getMaxX());
-        int minY = (int) Math.floor(box.getMinY());
-        int maxY = (int) Math.floor(box.getMaxY());
-        int minZ = (int) Math.floor(box.getMinZ());
-        int maxZ = (int) Math.floor(box.getMaxZ());
+
+        // Reducimos la caja un poco para evitar falsos positivos en bordes
+        double shrink = 0.1;
+        AxisAlignedBB innerBox = new AxisAlignedBB(
+                box.getMinX() + shrink,
+                box.getMinY() + shrink,
+                box.getMinZ() + shrink,
+                box.getMaxX() - shrink,
+                box.getMaxY() - shrink,
+                box.getMaxZ() - shrink
+        );
+
+        int minX = (int) Math.floor(innerBox.getMinX());
+        int maxX = (int) Math.floor(innerBox.getMaxX());
+        int minY = (int) Math.floor(innerBox.getMinY());
+        int maxY = (int) Math.floor(innerBox.getMaxY());
+        int minZ = (int) Math.floor(innerBox.getMinZ());
+        int maxZ = (int) Math.floor(innerBox.getMaxZ());
 
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     Block block = player.getLevel().getBlock(x, y, z);
-                    if (!block.isTransparent()) {
-                        return true;
+
+                    // Ignorar aire y escaleras
+                    if (block instanceof BlockAir || block instanceof BlockStairs) {
+                        continue;
+                    }
+
+                    // Solo cuenta si es sólido con bounding box
+                    if (!block.isTransparent() && block.getBoundingBox() != null) {
+                        if (innerBox.intersects(block.getBoundingBox())) {
+                            return true;
+                        }
                     }
                 }
             }
