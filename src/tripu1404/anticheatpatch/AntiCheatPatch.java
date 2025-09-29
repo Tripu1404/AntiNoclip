@@ -3,7 +3,6 @@ package tripu1404.anticheatpatch;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockAir;
-import cn.nukkit.block.BlockStairs;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerMoveEvent;
@@ -25,6 +24,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("§a[AntiCheatPatch] Activado correctamente.");
 
+        // Contador de ticks vividos por jugador (1 incremento cada segundo)
         getServer().getScheduler().scheduleRepeatingTask(this, new Task() {
             @Override
             public void onRun(int currentTick) {
@@ -86,7 +86,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
 
         // Reducimos la caja un poco para evitar falsos positivos en bordes
         double shrink = 0.1;
-        AxisAlignedBB innerBox = new AxisAlignedBB(
+        AxisAlignedBB innerBox = AxisAlignedBB.fromBounds(
                 box.getMinX() + shrink,
                 box.getMinY() + shrink,
                 box.getMinZ() + shrink,
@@ -107,14 +107,21 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                 for (int z = minZ; z <= maxZ; z++) {
                     Block block = player.getLevel().getBlock(x, y, z);
 
-                    // Ignorar aire y escaleras
-                    if (block instanceof BlockAir || block instanceof BlockStairs) {
+                    // Saltar aire y bloques transparentes
+                    if (block instanceof BlockAir || block.isTransparent()) {
                         continue;
                     }
 
-                    // Solo cuenta si es sólido con bounding box
-                    if (!block.isTransparent() && block.getBoundingBox() != null) {
-                        if (innerBox.intersects(block.getBoundingBox())) {
+                    // Si el bloque no tiene bounding box válida, ignorarlo
+                    if (block.getBoundingBox() == null) {
+                        continue;
+                    }
+
+                    // Solo considerar cubos completos (1x1x1)
+                    AxisAlignedBB bb = block.getBoundingBox();
+                    if (bb.getMinX() == block.getX() && bb.getMinY() == block.getY() && bb.getMinZ() == block.getZ()
+                            && bb.getMaxX() == block.getX() + 1 && bb.getMaxY() == block.getY() + 1 && bb.getMaxZ() == block.getZ() + 1) {
+                        if (innerBox.intersectsWith(bb)) {
                             return true;
                         }
                     }
