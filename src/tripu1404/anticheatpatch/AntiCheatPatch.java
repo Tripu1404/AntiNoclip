@@ -86,7 +86,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
 
         // Reducimos la caja un poco para evitar falsos positivos en bordes
         double shrink = 0.1;
-        AxisAlignedBB innerBox = AxisAlignedBB.fromBounds(
+        AxisAlignedBB innerBox = new AxisAlignedBB(
                 box.getMinX() + shrink,
                 box.getMinY() + shrink,
                 box.getMinZ() + shrink,
