@@ -1,6 +1,6 @@
-name: AntiCheatPatch
+name: AntiCrystalFixNK
 main: tripu1404.anticheatpatch.AntiCheatPatch
 version: 1.0
 api: ["1.0.0"]
-author: tripu1404
-description: Plugin para evitar cheats como NoClip o AntiCrystal.
+author: Tripu1404
+description: AntiCrystal Fix plugin.
