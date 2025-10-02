@@ -24,7 +24,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("§a[AntiCheatPatch] Activado correctamente.");
 
-        // Contador de ticks vividos por jugador (1 incremento cada segundo)
+        // Probably theres a better way but idk
         getServer().getScheduler().scheduleRepeatingTask(this, new Task() {
             @Override
             public void onRun(int currentTick) {
@@ -32,7 +32,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                     playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
                 }
             }
-        }, 20); // Cada 20 ticks = 1 segundo
+        }, 20); // 20 ticks = 1 sec
     }
 
     @EventHandler
@@ -84,7 +84,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
     private boolean isPlayerInsideSolidBlock(Player player) {
         AxisAlignedBB box = player.getBoundingBox();
 
-        // Reducimos la caja un poco para evitar falsos positivos en bordes
+        // Main function
         double shrink = 0.1;
         AxisAlignedBB innerBox = box.shrink(shrink, shrink, shrink);
 
@@ -100,13 +100,13 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                 for (int z = minZ; z <= maxZ; z++) {
                     Block block = player.getLevel().getBlock(x, y, z);
 
-                    // Saltar aire y bloques transparentes
+                    // Air Bypass
                     if (block instanceof BlockAir || block.isTransparent()) continue;
                     if (block.getBoundingBox() == null) continue;
 
                     AxisAlignedBB bb = block.getBoundingBox();
 
-                    // Solo considerar cubos completos (1x1x1)
+                    //This prevents false positives
                     if (bb.getMinX() == block.getX() && bb.getMinY() == block.getY() && bb.getMinZ() == block.getZ()
                             && bb.getMaxX() == block.getX() + 1 && bb.getMaxY() == block.getY() + 1 && bb.getMaxZ() == block.getZ() + 1) {
                         if (innerBox.intersectsWith(bb)) {
