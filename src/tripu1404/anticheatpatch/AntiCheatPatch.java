@@ -43,8 +43,14 @@ public class GravityPush extends PluginBase implements Listener {
             int attempts = pushAttempts.getOrDefault(uuid, 0);
 
             if (attempts < 3) {
-                // 🔹 Teletransportes suaves en 3 pasos para evadir hacks de velocity
-                for (int i = 1; i <= 3; i++) {
+                pushAttempts.put(uuid, attempts + 1);
+
+                // 🔹 Paso 1: Impulso inicial con setMotion()
+                Vector3 motion = player.getMotion().add(0, 0.15, 0);
+                player.setMotion(motion);
+
+                // 🔹 Paso 2 y 3: Teletransportes suaves para asegurar posición
+                for (int i = 1; i <= 2; i++) {
                     final int step = i;
                     getServer().getScheduler().scheduleDelayedTask(this, () -> {
                         if (player.isOnline()) {
@@ -53,8 +59,6 @@ public class GravityPush extends PluginBase implements Listener {
                         }
                     }, i); // i ticks de delay entre cada teletransporte
                 }
-
-                pushAttempts.put(uuid, attempts + 1);
             }
         }
     }
