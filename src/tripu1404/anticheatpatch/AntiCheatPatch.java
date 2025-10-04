@@ -3,6 +3,9 @@ package tripu1404.anticheatpatch;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockAir;
+import cn.nukkit.block.BlockGravel;
+import cn.nukkit.block.BlockSand;
+import cn.nukkit.block.BlockConcretePowder;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerMoveEvent;
@@ -24,7 +27,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("§a[AntiCheatPatch] Activado correctamente.");
 
-        // Probably theres a better way but idk
+        // Contador de ticks vividos por jugador
         getServer().getScheduler().scheduleRepeatingTask(this, new Task() {
             @Override
             public void onRun(int currentTick) {
@@ -32,7 +35,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                     playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
                 }
             }
-        }, 20); // 20 ticks = 1 sec
+        }, 20); // 20 ticks = 1 segundo
     }
 
     @EventHandler
@@ -84,7 +87,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
     private boolean isPlayerInsideSolidBlock(Player player) {
         AxisAlignedBB box = player.getBoundingBox();
 
-        // Main function
+        // Reducir un poco para evitar falsos positivos
         double shrink = 0.1;
         AxisAlignedBB innerBox = box.shrink(shrink, shrink, shrink);
 
@@ -100,13 +103,21 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                 for (int z = minZ; z <= maxZ; z++) {
                     Block block = player.getLevel().getBlock(x, y, z);
 
-                    // Air Bypass
+                    // Ignorar aire y transparentes
                     if (block instanceof BlockAir || block.isTransparent()) continue;
+
+                    // 🔹 Ignorar bloques de gravedad (para no chocar con GravityPush)
+                    if (block instanceof BlockSand
+                            || block instanceof BlockGravel
+                            || block instanceof BlockConcretePowder) {
+                        continue;
+                    }
+
                     if (block.getBoundingBox() == null) continue;
 
                     AxisAlignedBB bb = block.getBoundingBox();
 
-                    //This prevents false positives
+                    // Solo detectar colisión si es un bloque completo
                     if (bb.getMinX() == block.getX() && bb.getMinY() == block.getY() && bb.getMinZ() == block.getZ()
                             && bb.getMaxX() == block.getX() + 1 && bb.getMaxY() == block.getY() + 1 && bb.getMaxZ() == block.getZ() + 1) {
                         if (innerBox.intersectsWith(bb)) {
