@@ -1,71 +1,58 @@
-package tripu1404.gravitypush;
+package tripu1404.anticheatpatch;
 
 import cn.nukkit.Player;
+import cn.nukkit.Server;
 import cn.nukkit.block.Block;
-import cn.nukkit.block.BlockSand;
-import cn.nukkit.block.BlockGravel;
-import cn.nukkit.block.BlockConcretePowder;
-import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
+import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.player.PlayerMoveEvent;
-import cn.nukkit.plugin.PluginBase;
-import cn.nukkit.scheduler.Task;
 import cn.nukkit.math.Vector3;
+import cn.nukkit.plugin.PluginBase;
+import cn.nukkit.utils.TextFormat;
 
-import java.util.HashMap;
-import java.util.UUID;
-
-public class GravityPush extends PluginBase implements Listener {
-
-    private final HashMap<UUID, Block> lastBlock = new HashMap<>();
-    private final HashMap<UUID, Integer> pushAttempts = new HashMap<>();
+public class AntiCheatPatch extends PluginBase implements Listener {
 
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
-        getLogger().info("GravityPush enabled!");
+        getLogger().info(TextFormat.GREEN + "AntiCheatPatch cargado correctamente (Bloquea Clip / NoClip).");
     }
 
     @EventHandler
-    public void onMove(PlayerMoveEvent event) {
+    public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
-        UUID uuid = player.getUniqueId();
+        Vector3 to = event.getTo();
+        Vector3 from = event.getFrom();
 
-        Block currentBlock = player.getLevel().getBlock(player.floor());
-        Block previousBlock = lastBlock.getOrDefault(uuid, null);
-        lastBlock.put(uuid, currentBlock);
+        // Evita procesar si el jugador no se movió
+        if (to.distanceSquared(from) < 0.0001) return;
 
-        if (previousBlock == null || !previousBlock.equals(currentBlock)) {
-            pushAttempts.put(uuid, 0);
+        // Comprueba si el jugador está dentro de un bloque sólido
+        Block blockAt = player.getLevel().getBlock(to.floor());
+        if (blockAt != null && blockAt.isSolid() && blockAt.getId() != Block.AIR) {
+            // Si el bloque es sólido, cancelar el movimiento
+            event.setTo(from);
+            player.teleport(from);
+            player.sendTip(TextFormat.RED + "Movimiento ilegal detectado (Clip/NoClip bloqueado)");
+            return;
         }
 
-        if (isGravityBlock(currentBlock) && player.y < currentBlock.getY() + 1) {
-            int attempts = pushAttempts.getOrDefault(uuid, 0);
-
-            if (attempts < 3) {
-                pushAttempts.put(uuid, attempts + 1);
-
-                // 🔹 Paso 1: Impulso inicial con setMotion()
-                Vector3 motion = player.getMotion().add(0, 0.15, 0);
-                player.setMotion(motion);
-
-                // 🔹 Paso 2 y 3: Teletransportes suaves para asegurar posición
-                for (int i = 1; i <= 2; i++) {
-                    final int step = i;
-                    getServer().getScheduler().scheduleDelayedTask(this, () -> {
-                        if (player.isOnline()) {
-                            Vector3 targetPos = player.getLocation().add(0, 0.35 * step, 0);
-                            player.teleport(targetPos);
-                        }
-                    }, i); // i ticks de delay entre cada teletransporte
-                }
+        // Verifica si el jugador intenta moverse dentro de un bloque muy rápido (posible Clip)
+        if (to.y > from.y + 1.5 || to.y < from.y - 1.5) {
+            Block below = player.getLevel().getBlock(new Vector3(to.x, to.y - 0.5, to.z));
+            if (below.isSolid()) {
+                event.setTo(from);
+                player.teleport(from);
+                player.sendTip(TextFormat.RED + "Movimiento vertical sospechoso bloqueado");
             }
         }
-    }
 
-    private boolean isGravityBlock(Block block) {
-        return block instanceof BlockSand
-                || block instanceof BlockGravel
-                || block instanceof BlockConcretePowder;
+        // Detección de "NoClip" (entra dentro de bloques en eje X/Z)
+        Block front = player.getLevel().getBlock(new Vector3(to.x, to.y, to.z));
+        if (front.isSolid()) {
+            event.setTo(from);
+            player.teleport(from);
+            player.sendTip(TextFormat.RED + "Intento de atravesar bloque detectado (NoClip)");
+        }
     }
 }
