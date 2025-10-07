@@ -3,7 +3,8 @@ package tripu1404.anticheatpatch;
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
 import cn.nukkit.block.BlockAir;
-import cn.nukkit.block.BlockFalling;
+import cn.nukkit.block.BlockChest;
+import cn.nukkit.block.BlockEnderChest;
 import cn.nukkit.event.EventHandler;
 import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerMoveEvent;
@@ -26,7 +27,6 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         getServer().getPluginManager().registerEvents(this, this);
         getLogger().info("§a[AntiCheatPatch] Activado correctamente.");
 
-        // Contador de ticks vividos por jugador (1 incremento cada segundo)
         getServer().getScheduler().scheduleRepeatingTask(this, new Task() {
             @Override
             public void onRun(int currentTick) {
@@ -34,7 +34,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
                     playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
                 }
             }
-        }, 20); // Cada 20 ticks = 1 segundo
+        }, 20);
     }
 
     @EventHandler
@@ -42,116 +42,92 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         Player player = event.getPlayer();
         if (player == null || !player.isOnline()) return;
 
-        // si está planeando (elytra) no procesamos
         if (player.isGliding()) return;
 
         Location from = event.getFrom();
         Location to = event.getTo();
 
-        // evitar procesar si no hay movimiento real
         if (to.distanceSquared(from) < 0.0001) return;
 
-        double fromY = from.getY();
-        double toY = to.getY();
-        double deltaY = toY - fromY;
+        // Chequeo vertical
+        double deltaY = to.getY() - from.getY();
         int lived = playerTicks.getOrDefault(player.getName(), 0);
-
-        // Chequeo vertical (igual que antes)
-        boolean isInSolidBlockAtFrom = isPlayerInsideSolidBlockAtLocation(player, from);
-        if (isInSolidBlockAtFrom && !player.getAllowFlight() && player.getGamemode() != Player.CREATIVE) {
-            event.setCancelled(true);
-            event.setTo(from);
-            player.teleport(from);
-            return;
+        if (isInsideSolidBlock(player, from)) {
+            if (!player.getAllowFlight() && player.getGamemode() != Player.CREATIVE) {
+                event.setTo(from);
+                player.teleport(from);
+                event.setCancelled(true);
+                return;
+            }
+            if (Math.abs(deltaY) > MAX_VERTICAL_SPEED) {
+                event.setTo(from);
+                player.teleport(from);
+                event.setCancelled(true);
+                return;
+            }
+            if (!player.isOnGround() && deltaY < -0.5 && lived > 1) {
+                event.setTo(from);
+                player.teleport(from);
+                event.setCancelled(true);
+                return;
+            }
+            AxisAlignedBB box = player.getBoundingBox();
+            double boxHeight = box.getMaxY() - box.getMinY();
+            if (boxHeight < MIN_PLAYER_HEIGHT) {
+                event.setTo(from);
+                player.teleport(from);
+                event.setCancelled(true);
+                return;
+            }
         }
 
-        if (isInSolidBlockAtFrom && Math.abs(deltaY) > MAX_VERTICAL_SPEED && !player.getAllowFlight()) {
-            event.setCancelled(true);
-            event.setTo(from);
-            player.teleport(from);
-            return;
-        }
-
-        if (isInSolidBlockAtFrom
-                && !player.isOnGround()
-                && !player.getAllowFlight()
-                && player.getGamemode() != Player.CREATIVE
-                && deltaY < -0.5
-                && lived > 1) {
-            event.setCancelled(true);
-            event.setTo(from);
-            player.teleport(from);
-            return;
-        }
-
-        AxisAlignedBB playerBox = player.getBoundingBox();
-        double boxHeight = playerBox.getMaxY() - playerBox.getMinY();
-        if (isInSolidBlockAtFrom && boxHeight < MIN_PLAYER_HEIGHT) {
-            event.setCancelled(true);
-            event.setTo(from);
-            player.teleport(from);
-            return;
-        }
-
-        // --- NUEVA PARTE: detección horizontal robusta ---
-        // Creamos la "inner box" del jugador en la posición destino (movida)
-        double shrink = 0.1;
-        AxisAlignedBB baseBox = player.getBoundingBox();
-        // desplazamiento desde 'from' hasta 'to'
+        // Chequeo horizontal
         double dx = to.getX() - from.getX();
         double dy = to.getY() - from.getY();
         double dz = to.getZ() - from.getZ();
 
-        // Shrink la caja actual para evitar falsos positivos por rozar
-        AxisAlignedBB innerBoxAtFrom = baseBox.shrink(shrink, shrink, shrink);
-        // Movemos la caja a la posición destino
-        AxisAlignedBB innerBoxAtTo = innerBoxAtFrom.offset(dx, dy, dz);
+        AxisAlignedBB playerBox = player.getBoundingBox().shrink(0.1, 0.1, 0.1).offset(dx, dy, dz);
 
-        // Comprobamos todos los bloques que intersecta la caja destino
-        int minX = (int) Math.floor(innerBoxAtTo.getMinX());
-        int maxX = (int) Math.floor(innerBoxAtTo.getMaxX());
-        int minY = (int) Math.floor(innerBoxAtTo.getMinY());
-        int maxY = (int) Math.floor(innerBoxAtTo.getMaxY());
-        int minZ = (int) Math.floor(innerBoxAtTo.getMinZ());
-        int maxZ = (int) Math.floor(innerBoxAtTo.getMaxZ());
+        int minX = (int) Math.floor(playerBox.getMinX());
+        int maxX = (int) Math.floor(playerBox.getMaxX());
+        int minY = (int) Math.floor(playerBox.getMinY());
+        int maxY = (int) Math.floor(playerBox.getMaxY());
+        int minZ = (int) Math.floor(playerBox.getMinZ());
+        int maxZ = (int) Math.floor(playerBox.getMaxZ());
 
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     Block block = player.getLevel().getBlock(x, y, z);
+                    if (block instanceof BlockAir) continue;
 
-                    // Saltar aire y bloques transparentes
-                    if (block instanceof BlockAir || block.isTransparent()) continue;
+                    // Ignora bloques con gravedad
+                    String blockName = block.getName().toLowerCase();
+                    if (blockName.contains("sand") || blockName.contains("gravel")) continue;
 
-                    // Ignorar bloques con gravedad (sand, red_sand, gravel...) -> bypass solicitado
-                    if (block instanceof BlockFalling) continue;
-
-                    // Si no tiene bounding box, ignoramos
+                    // Ignora bloques incompletos (slabs, stairs)
                     if (block.getBoundingBox() == null) continue;
 
-                    AxisAlignedBB bb = block.getBoundingBox();
-
-                    // Solo considerar cubos completos (1x1x1) para evitar falsos positivos
-                    if (!(bb.getMinX() == block.getX() && bb.getMinY() == block.getY() && bb.getMinZ() == block.getZ()
-                            && bb.getMaxX() == block.getX() + 1 && bb.getMaxY() == block.getY() + 1 && bb.getMaxZ() == block.getZ() + 1)) {
-                        continue;
-                    }
-
-                    // Si la caja destino intersecta con la bounding box del bloque -> intento de traspasar
-                    if (innerBoxAtTo.intersectsWith(bb)) {
-                        // Movimiento horizontal (o en general) bloqueado
-                        event.setCancelled(true);
+                    // Bypass chests normales, pero bloquea ender chests
+                    if (block instanceof BlockChest) continue;
+                    if (block instanceof BlockEnderChest) {
                         event.setTo(from);
                         player.teleport(from);
-                        // Tip opcional: comentar si no quieres spam
-                        player.sendTip("§cIntento de atravesar bloque detectado y bloqueado.");
+                        event.setCancelled(true);
+                        player.sendTip("§cNo puedes atravesar un Ender Chest.");
+                        return;
+                    }
+
+                    if (playerBox.intersectsWith(block.getBoundingBox())) {
+                        event.setTo(from);
+                        player.teleport(from);
+                        event.setCancelled(true);
+                        player.sendTip("§cMovimiento ilegal detectado y bloqueado.");
                         return;
                     }
                 }
             }
         }
-
-        // --- fin detección horizontal ---
     }
 
     @EventHandler
@@ -159,47 +135,31 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         playerTicks.remove(event.getPlayer().getName());
     }
 
-    /**
-     * Comprueba si el jugador está dentro de un bloque sólido en una location concreta.
-     * Similar a versiones anteriores pero trabajando con la location pasada.
-     */
-    private boolean isPlayerInsideSolidBlockAtLocation(Player player, Location loc) {
-        AxisAlignedBB baseBox = player.getBoundingBox();
-        // desplazamiento desde la posición actual (getFrom) al loc solicitado:
+    private boolean isInsideSolidBlock(Player player, Location loc) {
+        AxisAlignedBB box = player.getBoundingBox().shrink(0.1, 0.1, 0.1);
         double dx = loc.getX() - player.getLocation().getX();
         double dy = loc.getY() - player.getLocation().getY();
         double dz = loc.getZ() - player.getLocation().getZ();
+        AxisAlignedBB movedBox = box.offset(dx, dy, dz);
 
-        double shrink = 0.1;
-        AxisAlignedBB innerBox = baseBox.shrink(shrink, shrink, shrink).offset(dx, dy, dz);
-
-        int minX = (int) Math.floor(innerBox.getMinX());
-        int maxX = (int) Math.floor(innerBox.getMaxX());
-        int minY = (int) Math.floor(innerBox.getMinY());
-        int maxY = (int) Math.floor(innerBox.getMaxY());
-        int minZ = (int) Math.floor(innerBox.getMinZ());
-        int maxZ = (int) Math.floor(innerBox.getMaxZ());
+        int minX = (int) Math.floor(movedBox.getMinX());
+        int maxX = (int) Math.floor(movedBox.getMaxX());
+        int minY = (int) Math.floor(movedBox.getMinY());
+        int maxY = (int) Math.floor(movedBox.getMaxY());
+        int minZ = (int) Math.floor(movedBox.getMinZ());
+        int maxZ = (int) Math.floor(movedBox.getMaxZ());
 
         for (int x = minX; x <= maxX; x++) {
             for (int y = minY; y <= maxY; y++) {
                 for (int z = minZ; z <= maxZ; z++) {
                     Block block = player.getLevel().getBlock(x, y, z);
+                    if (block instanceof BlockAir) continue;
 
-                    if (block.isTransparent()) continue;
-                    if (block.getBoundingBox() == null) continue;
+                    // Bypass para bloques con gravedad
+                    String blockName = block.getName().toLowerCase();
+                    if (blockName.contains("sand") || blockName.contains("gravel")) continue;
 
-                    // Ignorar bloques con gravedad (bypass para sand/gravel/...)
-                    if (block instanceof BlockFalling) continue;
-
-                    AxisAlignedBB bb = block.getBoundingBox();
-
-                    // Solo cubos completos
-                    if (!(bb.getMinX() == block.getX() && bb.getMinY() == block.getY() && bb.getMinZ() == block.getZ()
-                            && bb.getMaxX() == block.getX() + 1 && bb.getMaxY() == block.getY() + 1 && bb.getMaxZ() == block.getZ() + 1)) {
-                        continue;
-                    }
-
-                    if (innerBox.intersectsWith(bb)) {
+                    if (block.getBoundingBox() != null && movedBox.intersectsWith(block.getBoundingBox())) {
                         return true;
                     }
                 }
