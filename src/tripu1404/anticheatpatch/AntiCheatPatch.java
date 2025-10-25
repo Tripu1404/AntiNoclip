@@ -2,153 +2,122 @@ package tripu1404.anticheatpatch;
 
 import cn.nukkit.Player;
 import cn.nukkit.block.Block;
-import cn.nukkit.event.Listener;
+import cn.nukkit.block.BlockAir;
+import cn.nukkit.block.BlockChest;
+import cn.nukkit.block.BlockEnderChest;
 import cn.nukkit.event.EventHandler;
-import cn.nukkit.event.player.PlayerMoveEvent;
+import cn.nukkit.event.Listener;
 import cn.nukkit.event.player.PlayerInteractEvent;
-import cn.nukkit.event.inventory.EnchantItemEvent;
-import cn.nukkit.event.inventory.InventoryTransactionEvent;
-import cn.nukkit.inventory.Inventory;
-import cn.nukkit.item.Item;
-import cn.nukkit.item.enchantment.Enchantment;
-import cn.nukkit.level.Level;
+import cn.nukkit.event.player.PlayerMoveEvent;
+import cn.nukkit.event.player.PlayerQuitEvent;
+import cn.nukkit.level.Location;
+import cn.nukkit.math.AxisAlignedBB;
 import cn.nukkit.plugin.PluginBase;
-import cn.nukkit.utils.Vector3;
+import cn.nukkit.scheduler.Task;
 
 import java.util.HashMap;
-import java.util.UUID;
 
-public class FlightCheck extends PluginBase implements Listener {
+public class AntiCheatPatch extends PluginBase implements Listener {
 
-    private final HashMap<Player, double[]> lastGroundPos = new HashMap<>();
-    private final HashMap<UUID, Long> riptideBypass = new HashMap<>();
-    private final HashMap<UUID, Long> elytraBoost = new HashMap<>();
+    private final HashMap<String, Integer> playerTicks = new HashMap<>();
 
     @Override
     public void onEnable() {
         getServer().getPluginManager().registerEvents(this, this);
-    }
+        getLogger().info("§a[AntiCheatPatch] Activado correctamente.");
 
-    private boolean isInWaterOrLava(Player player) {
-        Level level = player.getLevel();
-        Vector3 pos = player.getPosition().floor();
-        Block block = level.getBlock(pos);
-        int id = block.getId();
-        return id == Block.WATER || id == Block.STILL_WATER || id == Block.LAVA || id == Block.STILL_LAVA;
-    }
-
-    @EventHandler
-    public void onRightClick(PlayerInteractEvent event) {
-        Player player = event.getPlayer();
-        Item item = event.getItem();
-
-        // Riptide en agua
-        if (item != null && item.getId() == Item.TRIDENT && item.hasEnchantment(30)) {
-            if (isInWaterOrLava(player)) {
-                riptideBypass.put(player.getUniqueId(), System.currentTimeMillis() + 1800);
+        getServer().getScheduler().scheduleRepeatingTask(this, new Task() {
+            @Override
+            public void onRun(int currentTick) {
+                for (Player p : getServer().getOnlinePlayers().values()) {
+                    playerTicks.put(p.getName(), playerTicks.getOrDefault(p.getName(), 0) + 1);
+                }
             }
-        }
-
-        // Elytra boost con cohete (ID 401)
-        if (item != null && item.getId() == 401) {
-            if (player.getInventory().getChestplate() != null &&
-                    player.getInventory().getChestplate().getId() == Item.ELYTRA) {
-                elytraBoost.put(player.getUniqueId(), System.currentTimeMillis() + 5000);
-            }
-        }
+        }, 20);
     }
 
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
+        if (player == null || !player.isOnline()) return;
+        if (player.getGamemode() == Player.CREATIVE || player.getAllowFlight()) return;
+        if (player.isGliding() || player.isInsideOfWater() || player.isOnLadder()) return;
 
-        if (player.isCreative() || player.isSpectator() || player.getAllowFlight()) return;
-        if (player.hasEffect(cn.nukkit.potion.Effect.LEVITATION) ||
-            player.hasEffect(cn.nukkit.potion.Effect.SLOW_FALLING)) return;
+        Location from = event.getFrom();
+        Location to = event.getTo();
 
-        Long bypassTime = riptideBypass.get(player.getUniqueId());
-        if (bypassTime != null && bypassTime > System.currentTimeMillis()) return;
-        else if (bypassTime != null) riptideBypass.remove(player.getUniqueId());
+        if (to == null || from == null || to.distanceSquared(from) < 0.0001) return;
 
-        double fromX = event.getFrom().getX();
-        double fromY = event.getFrom().getY();
-        double fromZ = event.getFrom().getZ();
+        AxisAlignedBB box = player.getBoundingBox().shrink(0.05, 0.05, 0.05);
 
-        double toX = event.getTo().getX();
-        double toY = event.getTo().getY();
-        double toZ = event.getTo().getZ();
-
-        double dx = toX - fromX;
-        double dz = toZ - fromZ;
-        double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
-        double deltaY = toY - fromY;
-
-        boolean onGround = player.onGround();
-
-        // Guardar última posición en suelo
-        if (onGround) {
-            lastGroundPos.put(player, new double[]{toX, toY, toZ});
-            return;
+        if (isInsideSolidBlock(player, box)) {
+            event.setTo(from);
+            player.teleport(from);
+            event.setCancelled(true);
         }
+    }
 
-        // Saltos y caídas normales
-        if (deltaY > 0 && deltaY <= 0.42 && horizontalDistance <= 0.5) return;
-        if (deltaY < 0 && Math.abs(deltaY) <= 0.78 && horizontalDistance <= 0.5) return;
+    @EventHandler
+    public void onQuit(PlayerQuitEvent e) {
+        playerTicks.remove(e.getPlayer().getName());
+    }
 
-        // Elytra con boost
-        if (player.getInventory().getChestplate() != null &&
-            player.getInventory().getChestplate().getId() == Item.ELYTRA &&
-            !player.isGliding()) {
+    // 🚫 Nuevo: bloquear interacción con Ender Chest en condiciones anómalas
+    @EventHandler
+    public void onEnderChestUse(PlayerInteractEvent event) {
+        Player player = event.getPlayer();
+        if (player == null || !player.isOnline()) return;
 
-            double maxHorizontal = 0.6;
-            double maxVertical = 0.5;
-
-            Long boostTime = elytraBoost.get(player.getUniqueId());
-            if (boostTime != null && boostTime > System.currentTimeMillis()) {
-                maxHorizontal = 2.0;
-                maxVertical = 1.0;
-            }
-
-            if (horizontalDistance > maxHorizontal || Math.abs(deltaY) > maxVertical) {
+        Block block = event.getBlock();
+        if (block instanceof BlockEnderChest) {
+            AxisAlignedBB playerBox = player.getBoundingBox().shrink(0.05, 0.05, 0.05);
+            if (isInsideSolidBlock(player, playerBox)) {
                 event.setCancelled(true);
-                return;
+                player.sendPopup("§cNo puedes usar Ender Chest dentro de bloques.");
             }
         }
-
-        // Movimiento ilegal sin Elytra ni Riptide
-        if (!player.isGliding() &&
-            (player.getInventory().getChestplate() == null ||
-            player.getInventory().getChestplate().getId() != Item.ELYTRA)) {
-            event.setCancelled(true);
-        }
     }
 
-    @EventHandler
-    public void onEnchant(EnchantItemEvent event) {
-        Player player = event.getWho();
-        if (player == null) return;
+    private boolean isInsideSolidBlock(Player player, AxisAlignedBB playerBox) {
+        int minX = (int) Math.floor(playerBox.getMinX());
+        int maxX = (int) Math.floor(playerBox.getMaxX());
+        int minY = (int) Math.floor(playerBox.getMinY());
+        int maxY = (int) Math.floor(playerBox.getMaxY());
+        int minZ = (int) Math.floor(playerBox.getMinZ());
+        int maxZ = (int) Math.floor(playerBox.getMaxZ());
 
-        // Cancelar bypass de niveles de XP
-        int levelCost = event.getLevelCost();
-        if (levelCost > player.getLevel()) {
-            event.setCancelled(true);
-        }
-    }
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    Block block = player.getLevel().getBlock(x, y, z);
+                    if (block instanceof BlockAir) continue;
 
-    @EventHandler
-    public void onInventoryTransaction(InventoryTransactionEvent event) {
-        // Cancelar cualquier encantamiento ilegal o manipulación de yunque
-        for (InventoryAction action : event.getTransaction().getActions()) {
-            Item source = action.getSourceItem();
-            if (source == null) continue;
+                    String name = block.getName().toLowerCase();
 
-            // Eliminar encantamientos ilegales
-            for (Enchantment e : source.getEnchantments()) {
-                int maxLevel = Enchantment.getEnchantment(e.getTypeId()).getMaxLevel();
-                if (e.getLevel() > maxLevel) {
-                    source.removeEnchantment(e.getTypeId());
+                    // Ignorar bloques incompletos y con gravedad
+                    if (block.getBoundingBox() == null) continue;
+                    if (name.contains("sand") || name.contains("gravel")) continue;
+
+                    // Ignorar cofres normales
+                    if (block instanceof BlockChest) continue;
+
+                    AxisAlignedBB blockBox = block.getBoundingBox();
+
+                    // Bloquear si el jugador está realmente dentro del bloque
+                    if (blockBox.shrink(0.1, 0.1, 0.1).intersectsWith(playerBox)) {
+                        double overlapY = Math.min(blockBox.getMaxY(), playerBox.getMaxY()) - Math.max(blockBox.getMinY(), playerBox.getMinY());
+                        double overlapX = Math.min(blockBox.getMaxX(), playerBox.getMaxX()) - Math.max(blockBox.getMinX(), playerBox.getMinX());
+                        double overlapZ = Math.min(blockBox.getMaxZ(), playerBox.getMaxZ()) - Math.max(blockBox.getMinZ(), playerBox.getMinZ());
+
+                        if (overlapX > 0.3 && overlapY > 0.3 && overlapZ > 0.3) {
+                            // ❗ Si el bloque es un Ender Chest, bloquear interacción también
+                            if (block instanceof BlockEnderChest) return true;
+                            return true;
+                        }
+                    }
                 }
             }
         }
+        return false;
     }
 }
