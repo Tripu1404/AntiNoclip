@@ -62,7 +62,7 @@ public class AntiCheatPatch extends PluginBase implements Listener {
         playerTicks.remove(e.getPlayer().getName());
     }
 
-    // 🚫 Nuevo: bloquear interacción con Ender Chest en condiciones anómalas
+    //  Nuevo: bloquear interacción con Ender Chest en condiciones anómalas
     @EventHandler
     public void onEnderChestUse(PlayerInteractEvent event) {
         Player player = event.getPlayer();
